@@ -20,6 +20,7 @@
 #pragma once
 
 #include <gtk/gtk.h>
+#include <screenshot-ext.h>
 
 G_BEGIN_DECLS
 
@@ -29,6 +30,9 @@ typedef void (*ScreenshotResponseFunc) (gint     response,
                                         gpointer user_data);
 
 GdkPixbuf *screenshot_get_pixbuf          (GdkRectangle *rectangle);
+
+struct ScreenshotExt
+screenshot_get_pixbuf_ext                 (GdkRectangle *rectangle);
 
 void       screenshot_show_dialog         (GtkWindow              *parent,
                                            GtkMessageType          message_type,

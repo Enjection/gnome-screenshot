@@ -26,6 +26,7 @@
 #include "screenshot-config.h"
 
 #include <glib/gstdio.h>
+#include <stdio.h>
 
 struct _ScreenshotBackendShell
 {
@@ -82,7 +83,7 @@ screenshot_backend_shell_get_pixbuf (ScreenshotBackend *backend,
     }
 
   connection = g_application_get_dbus_connection (g_application_get_default ());
-  g_dbus_connection_call_sync (connection,
+    g_dbus_connection_call_sync (connection,
                                "org.gnome.Shell.Screenshot",
                                "/org/gnome/Shell/Screenshot",
                                "org.gnome.Shell.Screenshot",
@@ -105,6 +106,118 @@ screenshot_backend_shell_get_pixbuf (ScreenshotBackend *backend,
   return screenshot;
 }
 
+static struct ScreenshotExt
+screenshot_backend_shell_get_pixbuf_ext (ScreenshotBackend *backend,
+                                     GdkRectangle      *rectangle)
+{
+  struct ScreenshotExt retval;
+  retval.window_name = NULL;
+  g_autoptr(GError) error = NULL;
+  g_autofree gchar *path = NULL, *filename = NULL, *tmpname = NULL;
+  GdkPixbuf *screenshot = NULL;
+  const gchar *method_name;
+  GVariant *method_params;
+  GDBusConnection *connection;
+
+  path = g_build_filename (g_get_user_cache_dir (), "gnome-screenshot", NULL);
+  g_mkdir_with_parents (path, 0700);
+
+  tmpname = g_strdup_printf ("scr-%d.png", g_random_int ());
+  filename = g_build_filename (path, tmpname, NULL);
+
+  if (screenshot_config->take_window_shot)
+    {
+      method_name = "ScreenshotWindow";
+      method_params = g_variant_new ("(bbbs)",
+                                     TRUE,
+                                     screenshot_config->include_pointer,
+                                     TRUE, /* flash */
+                                     filename);
+    }
+  else if (rectangle != NULL)
+    {
+      method_name = "ScreenshotArea";
+      method_params = g_variant_new ("(iiiibs)",
+                                     rectangle->x, rectangle->y,
+                                     rectangle->width, rectangle->height,
+                                     TRUE, /* flash */
+                                     filename);
+    }
+  else
+    {
+      method_name = "Screenshot";
+      method_params = g_variant_new ("(bbs)",
+                                     screenshot_config->include_pointer,
+                                     TRUE, /* flash */
+                                     filename);
+    }
+
+  connection = g_application_get_dbus_connection (g_application_get_default ());
+  GVariant *res = g_dbus_connection_call_sync (connection,
+                               "org.gnome.Shell",
+                               "/org/gnome/Shell",
+                               "org.gnome.Shell",
+                               "Eval",
+                               g_variant_new (
+                                   "(s)",
+                                   "global.get_window_actors().findIndex(a=>a.meta_window.has_focus()===true)"),
+                               G_VARIANT_TYPE("(bs)"),
+                               G_DBUS_CALL_FLAGS_NONE,
+                               -1,
+                               NULL,
+                               &error);
+  if(error == NULL){
+gboolean truth;
+gchar* result;
+g_variant_get (res, "(bs)", &truth, &result);
+char buffer [256];
+snprintf(buffer, 256, "global.get_window_actors()[%s].get_meta_window().get_wm_class()", result);
+res = g_dbus_connection_call_sync (connection,
+                               "org.gnome.Shell",
+                               "/org/gnome/Shell",
+                               "org.gnome.Shell",
+                               "Eval",
+                               g_variant_new (
+                                   "(s)",
+                                   buffer),
+                               G_VARIANT_TYPE("(bs)"),
+                               G_DBUS_CALL_FLAGS_NONE,
+                               -1,
+                               NULL,
+                               &error);
+g_variant_get (res, "(bs)", &truth, &result);
+retval.window_name = result;
+  }
+  else
+    {
+        fprintf (stderr, "Unable to read file: %s\n", error->message);
+    }
+
+  g_dbus_connection_call_sync (connection,
+                               "org.gnome.Shell.Screenshot",
+                               "/org/gnome/Shell/Screenshot",
+                               "org.gnome.Shell.Screenshot",
+                               method_name,
+                               method_params,
+                               NULL,
+                               G_DBUS_CALL_FLAGS_NONE,
+                               -1,
+                               NULL,
+                               &error);
+
+  if (error == NULL)
+    {
+      screenshot = gdk_pixbuf_new_from_file (filename, &error);
+
+      /* remove the temporary file created by the shell */
+      g_unlink (filename);
+    }
+
+  retval.pixbuf = screenshot;
+
+  return retval;
+}
+
 static void
 screenshot_backend_shell_class_init (ScreenshotBackendShellClass *klass)
 {
@@ -119,6 +232,7 @@ static void
 screenshot_backend_shell_backend_init (ScreenshotBackendInterface *iface)
 {
   iface->get_pixbuf = screenshot_backend_shell_get_pixbuf;
+  iface->get_pixbuf_ext = screenshot_backend_shell_get_pixbuf_ext;
 }
 
 ScreenshotBackend *

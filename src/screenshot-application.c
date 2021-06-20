@@ -481,12 +481,10 @@ screenshot_release_cb (gint                   response,
 static void
 finish_take_screenshot (ScreenshotApplication *self)
 {
-  GdkPixbuf *screenshot;
-
-  screenshot = screenshot_get_pixbuf (self->rectangle);
+  struct ScreenshotExt screenshot = screenshot_get_pixbuf_ext (self->rectangle);
   g_clear_pointer (&self->rectangle, g_free);
 
-  if (screenshot == NULL)
+  if (screenshot.pixbuf == NULL)
     {
       g_critical ("Unable to capture a screenshot of any window");
 
@@ -502,7 +500,7 @@ finish_take_screenshot (ScreenshotApplication *self)
       return;
     }
 
-  self->screenshot = screenshot;
+  self->screenshot = screenshot.pixbuf;
 
   if (screenshot_config->copy_to_clipboard)
     {
@@ -529,7 +527,12 @@ finish_take_screenshot (ScreenshotApplication *self)
       screenshot_save_to_file (self);
     }
   else
-    screenshot_build_filename_async (screenshot_config->save_dir, NULL, build_filename_ready_cb, self);
+    {
+      g_autoptr(GDateTime) d = g_date_time_new_now_local ();
+      gchar *date_origin = g_date_time_format (d, "%Y-%m-%dT%H-%M-%S");
+      gchar *origin = g_strdup_printf (_("%s_%s"), date_origin, screenshot.window_name);
+      screenshot_build_filename_async (screenshot_config->save_dir, origin, build_filename_ready_cb, self);
+    }
 }
 
 static gboolean

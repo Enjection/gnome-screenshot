@@ -55,7 +55,6 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS
   default_screen = gdk_screen_get_default ();
   window = gdk_screen_get_active_window (default_screen);
 G_GNUC_END_IGNORE_DEPRECATIONS
-
   return window;
 }
 

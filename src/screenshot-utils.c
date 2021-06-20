@@ -70,6 +70,47 @@ screenshot_get_pixbuf (GdkRectangle *rectangle)
   return screenshot;
 }
 
+
+struct ScreenshotExt 
+screenshot_get_pixbuf_ext (GdkRectangle *rectangle)
+{
+  struct ScreenshotExt retval;
+  retval.pixbuf = NULL;
+  retval.window_name = NULL;
+  gboolean force_fallback = FALSE;
+  g_autoptr (ScreenshotBackend) backend = NULL;
+
+#ifdef HAVE_X11
+  force_fallback = g_getenv ("GNOME_SCREENSHOT_FORCE_FALLBACK") != NULL;
+#endif
+
+  if (!force_fallback)
+    {
+      backend = screenshot_backend_shell_new ();
+      retval = screenshot_backend_get_pixbuf_ext (backend, rectangle);
+      if (!retval.pixbuf)
+#ifdef HAVE_X11
+        g_message ("Unable to use GNOME Shell's builtin screenshot interface, "
+                   "resorting to fallback X11.");
+#else
+        g_message ("Unable to use GNOME Shell's builtin screenshot interface.");
+#endif
+  }
+  else
+    g_message ("Using fallback X11 as requested");
+
+#ifdef HAVE_X11
+  if (!retval.pixbuf)
+    {
+      g_clear_object (&backend);
+      backend = screenshot_backend_x11_new ();
+      retval.pixbuf = screenshot_backend_get_pixbuf (backend, rectangle);
+    }
+#endif
+
+  return retval;
+}
+
 typedef struct
 {
   ScreenshotResponseFunc callback;

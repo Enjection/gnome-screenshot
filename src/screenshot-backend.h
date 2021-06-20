@@ -20,6 +20,7 @@
 #pragma once
 
 #include <gtk/gtk.h>
+#include <screenshot-ext.h>
 
 G_BEGIN_DECLS
 
@@ -33,9 +34,15 @@ struct _ScreenshotBackendInterface
 
   GdkPixbuf * (*get_pixbuf) (ScreenshotBackend *self,
                              GdkRectangle      *rectangle);
+
+  struct ScreenshotExt (*get_pixbuf_ext) (ScreenshotBackend *self,
+                             GdkRectangle      *rectangle);
 };
 
 GdkPixbuf *screenshot_backend_get_pixbuf (ScreenshotBackend *self,
+                                          GdkRectangle      *rectangle);
+
+struct ScreenshotExt screenshot_backend_get_pixbuf_ext (ScreenshotBackend *self,
                                           GdkRectangle      *rectangle);
 
 G_END_DECLS

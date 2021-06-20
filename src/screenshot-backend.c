@@ -40,5 +40,32 @@ screenshot_backend_get_pixbuf (ScreenshotBackend *self,
 
   g_return_val_if_fail (iface->get_pixbuf != NULL, NULL);
 
+      printf("hmm");
   return iface->get_pixbuf (self, rectangle);
+}
+ 
+struct ScreenshotExt screenshot_backend_get_pixbuf_ext (ScreenshotBackend *self,
+                                          GdkRectangle      *rectangle)
+{
+  struct ScreenshotExt retval;
+  
+  retval.window_name = NULL;
+  retval.pixbuf = NULL;
+
+  ScreenshotBackendInterface *iface;
+
+  g_return_val_if_fail (SCREENSHOT_IS_BACKEND (self), retval);
+
+  iface = SCREENSHOT_BACKEND_GET_IFACE (self);
+
+  g_return_val_if_fail (iface->get_pixbuf != NULL, retval);
+
+  if(iface->get_pixbuf_ext != NULL)
+  {
+      return iface->get_pixbuf_ext (self, rectangle);
+  }
+
+  retval.pixbuf = iface->get_pixbuf (self, rectangle);
+
+  return retval;
 }
